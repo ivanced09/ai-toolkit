@@ -249,6 +249,9 @@ class BucketsMixin:
                     pad = [batch[i % len(batch)] for i in range(self.batch_size - len(batch))]
                     batch = batch + pad
                 self.batch_indices.append(batch)
+        if not self.shuffle_images:
+            # Keep compatible batches intact and order them by their first file.
+            self.batch_indices.sort(key=lambda batch: batch[0])
 
     def shuffle_buckets(self: 'AiToolkitDataset'):
         for key, bucket in self.buckets.items():
@@ -357,7 +360,8 @@ class BucketsMixin:
             self.buckets[bucket_key].file_list_idx.append(idx)
 
         # print the buckets
-        self.shuffle_buckets()
+        if self.shuffle_images:
+            self.shuffle_buckets()
         self.build_batch_indices()
         if not quiet:
             print_acc(f'Bucket sizes for {self.dataset_path}:')

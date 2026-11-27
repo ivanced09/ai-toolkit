@@ -2265,11 +2265,13 @@ class BaseSDTrainProcess(BaseTrainProcess):
             self.data_loader = get_dataloader_from_datasets(
                 self.datasets, self.train_config.batch_size, self.sd,
                 pool_datasets=self.train_config.pool_datasets,
+                shuffle_images=self.train_config.shuffle_images,
             )
         if self.datasets_reg is not None:
             self.data_loader_reg = get_dataloader_from_datasets(
                 self.datasets_reg, self.train_config.batch_size, self.sd,
                 pool_datasets=self.train_config.pool_datasets,
+                shuffle_images=self.train_config.shuffle_images,
             )
 
         # a fresh text-embedding cache leaves the text encoder on the gpu (the
