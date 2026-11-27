@@ -157,6 +157,7 @@ export interface ValidationConfig {
 
 export interface TrainConfig {
   batch_size: number;
+  shuffle_images?: boolean;
   bypass_guidance_embedding?: boolean;
   steps: number;
   gradient_accumulation: number;

@@ -307,6 +307,25 @@ Images are never upscaled but they are downscaled and placed in buckets for batc
 The loader will automatically resize them and can handle varying aspect ratios. 
 
 
+### Image order during training
+
+**Shuffle Images** is enabled by default. For a repeatable image sequence, turn it off in the training UI or set
+`shuffle_images: false` in the training process's YAML configuration:
+
+```yaml
+train:
+  shuffle_images: false
+```
+
+Each epoch uses natural filename order (for example, `2.jpg` before `10.jpg`). Repeats and pre-generated flips of
+the same image appear together in this order. Separate datasets are read in configuration order. With **Pool
+Datasets** enabled, filenames are sorted across the pooled folders, with the path breaking filename ties.
+
+Batches still come from compatible buckets. Each bucket takes its images in filename order and the resulting batches
+are ordered by their first image. This can place a later filename ahead of an earlier one from another bucket.
+Bucket padding can also repeat images at the end of a batch. If a file fails to load during iteration, ordered loading
+reports the error so a replacement cannot change the requested image sequence.
+
 ## Training Specific Layers
 
 To train specific layers with LoRA, you can use the `only_if_contains` network kwargs. For instance, if you want to train only the 2 layers

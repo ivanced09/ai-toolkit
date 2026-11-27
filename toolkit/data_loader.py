@@ -2,6 +2,7 @@ import copy
 import json
 import os
 import random
+import re
 import traceback
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
@@ -383,6 +384,11 @@ class PairedImageDataset(Dataset):
         return img, prompt, (self.neg_weight, self.pos_weight)
 
 
+def natural_filename_key(path: str) -> tuple:
+    parts = re.split(r'([0-9]+)', os.path.basename(path).casefold())
+    return tuple(int(part) if i % 2 else part for i, part in enumerate(parts)), path
+
+
 class AiToolkitDataset(LatentCachingMixin, ControlCachingMixin, CLIPCachingMixin, TextEmbeddingCachingMixin, BucketsMixin, CaptionMixin, Dataset):
 
     def __init__(
@@ -391,11 +397,13 @@ class AiToolkitDataset(LatentCachingMixin, ControlCachingMixin, CLIPCachingMixin
             batch_size=1,
             sd: 'StableDiffusion' = None,
             source_configs: List['DatasetConfig'] = None,
+            shuffle_images: bool = True,
     ):
         # a pooled dataset scans several configs into ONE file_list so buckets and
         # batches mix across folders. Single-source is the same code with one config.
         self.source_configs: List['DatasetConfig'] = list(source_configs) if source_configs else [dataset_config]
         self.is_pooled = len(self.source_configs) > 1
+        self.shuffle_images = shuffle_images
         self.dataset_config = dataset_config
         # update bucket divisibility
         for config in self.source_configs:
@@ -442,6 +450,9 @@ class AiToolkitDataset(LatentCachingMixin, ControlCachingMixin, CLIPCachingMixin
 
         for config in self.source_configs:
             self._scan_source(config)
+
+        if not self.shuffle_images:
+            self.file_list.sort(key=lambda item: natural_filename_key(item.path))
 
         if self.is_pooled:
             print_acc(f"Pooled {len(self.source_configs)} datasets into {len(self.file_list)} items")
@@ -675,6 +686,8 @@ class AiToolkitDataset(LatentCachingMixin, ControlCachingMixin, CLIPCachingMixin
         try:
             file_item.load_and_process_image(file_item.dataloader_transforms or self.transform)
         except Exception as e:
+            if not self.shuffle_images:
+                raise RuntimeError(f"Failed to load ordered training image: {file_item.path}") from e
             print(f"Error loading image, skipping and loading a different one: {file_item.path} ({e})")
             if _attempts >= 10:
                 # avoid infinite recursion if many files are corrupt
@@ -689,7 +702,7 @@ class AiToolkitDataset(LatentCachingMixin, ControlCachingMixin, CLIPCachingMixin
             # for buckets we collate ourselves for now
             # todo allow a scheduler to dynamically make buckets
             # we collate ourselves
-            if len(self.batch_indices) - 1 < item:
+            if self.shuffle_images and len(self.batch_indices) - 1 < item:
                 # tried everything to solve this. No way to reset length when redoing things. Pick another index
                 item = random.randint(0, len(self.batch_indices) - 1)
             idx_list = self.batch_indices[item]
@@ -716,6 +729,7 @@ def get_dataloader_from_datasets(
         batch_size=1,
         sd: 'StableDiffusion' = None,
         pool_datasets: bool = False,
+        shuffle_images: bool = True,
 ) -> DataLoader:
     if dataset_options is None or len(dataset_options) == 0:
         return None
@@ -758,12 +772,15 @@ def get_dataloader_from_datasets(
             batch_size=batch_sizes.pop(),
             sd=sd,
             source_configs=dataset_config_list,
+            shuffle_images=shuffle_images,
         ))
     else:
         for config in dataset_config_list:
             # dataset level batch_size overrides the train config batch_size when set
             dataset_batch_size = config.batch_size if config.batch_size is not None else batch_size
-            datasets.append(AiToolkitDataset(config, batch_size=dataset_batch_size, sd=sd))
+            datasets.append(AiToolkitDataset(
+                config, batch_size=dataset_batch_size, sd=sd, shuffle_images=shuffle_images,
+            ))
 
     concatenated_dataset = ConcatDataset(datasets)
 
@@ -810,7 +827,7 @@ def get_dataloader_from_datasets(
             concatenated_dataset,
             batch_size=None,  # we batch in the datasets for now
             drop_last=False,
-            shuffle=True,
+            shuffle=shuffle_images,
             collate_fn=dto_collation,  # Use the custom collate function
             **dataloader_kwargs
         )
@@ -825,7 +842,7 @@ def get_dataloader_from_datasets(
         data_loader = DataLoader(
             concatenated_dataset,
             batch_size=batch_size,
-            shuffle=True,
+            shuffle=shuffle_images,
             collate_fn=dto_collation,
             **dataloader_kwargs
         )

@@ -288,6 +288,16 @@ const docs: { [key: string]: ConfigDoc } = {
       </>
     ),
   },
+  'train.shuffle_images': {
+    title: 'Shuffle Images',
+    description: (
+      <>
+        On by default. Turn it off to repeat natural filename order (2.jpg before 10.jpg) each epoch.
+        Existing buckets keep batches compatible, so a batch can contain later filenames before the next batch starts.
+        Separate datasets follow their configured order. Pool Datasets sorts filenames across the pooled folders.
+      </>
+    ),
+  },
   'train.pool_datasets': {
     title: 'Pool Datasets',
     description: (

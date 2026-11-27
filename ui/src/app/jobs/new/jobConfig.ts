@@ -69,6 +69,7 @@ export const defaultJobConfig: JobConfig = {
         datasets: [defaultDatasetConfig],
         train: {
           batch_size: 1,
+          shuffle_images: true,
           bypass_guidance_embedding: true,
           steps: 3000,
           gradient_accumulation: 1,

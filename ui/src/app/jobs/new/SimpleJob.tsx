@@ -713,6 +713,13 @@ export default function SimpleJob({
                   min={1}
                   required
                 />
+                <Checkbox
+                  label="Shuffle Images"
+                  docKey="train.shuffle_images"
+                  className="pt-2"
+                  checked={jobConfig.config.process[0].train.shuffle_images ?? true}
+                  onChange={value => setJobConfig(value, 'config.process[0].train.shuffle_images')}
+                />
                 <NumberInput
                   label="Gradient Accumulation"
                   className="pt-2"
